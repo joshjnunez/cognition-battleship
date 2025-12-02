@@ -1,5 +1,3 @@
-// TODO: Define game types (e.g., Cell, Ship, Board, GameState, Player)
-
 export type CellStatus = 'empty' | 'ship' | 'hit' | 'miss';
 
 export interface Coordinates {
@@ -31,6 +29,16 @@ export type PlayerType = 'human' | 'ai';
 
 export type GamePhase = 'placing' | 'playing' | 'finished';
 
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+export interface AiState {
+  shotHistory: Coordinates[];
+  huntQueue: Coordinates[];
+  lastHit: Coordinates | null;
+  currentDirection: 'up' | 'down' | 'left' | 'right' | null;
+  hitStreak: Coordinates[];
+}
+
 export interface GameState {
   playerBoard: Board;
   aiBoard: Board;
@@ -38,4 +46,6 @@ export interface GameState {
   phase: GamePhase;
   winner: PlayerType | null;
   turnCount: number;
+  difficulty: Difficulty;
+  aiState: AiState;
 }
