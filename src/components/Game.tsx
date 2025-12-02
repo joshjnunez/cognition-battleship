@@ -52,7 +52,7 @@ const createInitialGameState = (difficulty: Difficulty): GameState => {
 };
 
 export default function Game() {
-  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('medium');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('easy');
   const [state, setState] = useState<GameState>(() => createInitialGameState(selectedDifficulty));
   const [placementIndex, setPlacementIndex] = useState<number | null>(null);
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
@@ -225,9 +225,7 @@ export default function Game() {
       return `Place your ${ship.name} (${ship.length}) - ${orientation === 'horizontal' ? 'Horizontal' : 'Vertical'}`;
     }
 
-    return state.currentTurn === 'human'
-      ? 'Your turn: click a cell on Opponent\'s Waters to fire.'
-      : "AI's turn";
+    return '';
   })();
 
   return (
@@ -239,7 +237,7 @@ export default function Game() {
             <button
               type="button"
               onClick={() => setShowHelp(true)}
-              className="inline-flex items-center rounded-full border border-slate-600 px-2 py-0.5 text-[10px] sm:text-[11px] text-slate-200 hover:bg-slate-800"
+              className="inline-flex items-center rounded-full bg-sky-600 hover:bg-sky-500 text-white border border-sky-400 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold shadow-sm"
             >
               How to Play
             </button>
@@ -250,7 +248,9 @@ export default function Game() {
         </div>
         <div className="flex flex-col items-center sm:items-end gap-1.5 sm:gap-2 text-center sm:text-right text-xs sm:text-sm">
           <div className="text-[11px] sm:text-xs text-slate-400">Turn: {state.turnCount}</div>
-          <div className="text-sm font-medium text-slate-100 max-w-xs sm:max-w-none">{statusText}</div>
+          {statusText && (
+            <div className="text-sm font-medium text-slate-100 max-w-xs sm:max-w-none">{statusText}</div>
+          )}
           <div className="mt-1 flex flex-col gap-1.5 sm:gap-2 items-center sm:items-end w-full">
             <div className="w-full max-w-xs sm:max-w-sm md:max-w-md rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1.5 flex flex-col gap-1.5">
               <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-300 justify-center sm:justify-end">
@@ -274,7 +274,7 @@ export default function Game() {
               {state.difficulty === 'hard' && (
                 <p className="text-[10px] sm:text-[11px] text-slate-400 text-center sm:text-right leading-snug">
                   Heatmap on Your Fleet shows where Hard AI thinks your ships are most likely.
-                  Darker cells = higher probability.
+                
                 </p>
               )}
               {state.phase === 'placing' && (
@@ -309,7 +309,12 @@ export default function Game() {
                   <button
                     type="button"
                     onClick={() => setShowHardInsight((v) => !v)}
-                    className="px-2 py-0.5 rounded-md border border-slate-600 text-[11px] text-slate-200 bg-slate-800 hover:bg-slate-700"
+                    className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition-colors ${
+                      showHardInsight
+                        ? 'border-sky-400 bg-sky-600 text-white hover:bg-sky-500'
+                        : 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700'
+                    }`}
+                    aria-pressed={showHardInsight}
                   >
                     {showHardInsight ? 'Hide Hard AI Heatmap' : 'Show Hard AI Heatmap'}
                   </button>

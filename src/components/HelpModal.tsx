@@ -67,7 +67,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
             <p className="text-slate-300">
               On Hard, you can toggle the <span className="font-semibold">Show Hard AI Heatmap</span> button.
               Your Fleet will show a blue overlay where the AI believes your ships are most likely.
-              Darker blue means higher probability.
+              Lighter blue means higher probability.
             </p>
           </section>
 
