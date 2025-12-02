@@ -239,18 +239,6 @@ export const getAiMoveForDifficulty = (gameState: GameState): Coordinates | null
       target = getEasyMove(playerBoard, aiState);
   }
 
-  // Debug logging to help verify behavior; safe to remove later.
-  if (typeof window !== 'undefined') {
-    // eslint-disable-next-line no-console
-    console.log('[AI] move', {
-      difficulty,
-      target,
-      huntQueueSize: aiState.huntQueue.length,
-      hitStreakSize: aiState.hitStreak.length,
-      shotsTaken: aiState.shotHistory.length,
-    });
-  }
-
   return target;
 };
 

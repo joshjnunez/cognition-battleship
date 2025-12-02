@@ -109,13 +109,6 @@ export default function Game() {
     currentState: GameState
   ): { nextBoard: Board; aiWon: boolean; newAiState: AiState; hardDebug?: GameState['hardDebug'] } => {
     const target = getAiMoveForDifficulty(currentState);
-    if (typeof window !== 'undefined') {
-      // eslint-disable-next-line no-console
-      console.log('[AI] turn', {
-        difficulty: currentState.difficulty,
-        target,
-      });
-    }
     if (!target) {
       const aiWon = allShipsSunk(board);
       // No valid target; just return current board and AI state.
