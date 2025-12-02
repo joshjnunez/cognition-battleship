@@ -6,7 +6,7 @@ function App() {
       <header className="bg-slate-800 border-b border-slate-700 shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            Cognition Battleship
+            Josh Nunez's Battleship
           </h1>
         </div>
       </header>
