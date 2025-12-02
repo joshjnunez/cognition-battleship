@@ -1,4 +1,4 @@
-import Placeholder from './components/Placeholder'
+import Game from './components/Game'
 
 function App() {
   return (
@@ -14,7 +14,7 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 py-12">
         <div className="flex justify-center">
           <div className="w-full max-w-2xl">
-            <Placeholder />
+            <Game />
           </div>
         </div>
       </main>
