@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react';
-
 interface HelpModalProps {
   open: boolean;
   onClose: () => void;
