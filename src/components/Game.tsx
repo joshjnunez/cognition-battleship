@@ -7,7 +7,8 @@ import {
   placeShipAt,
   receiveAttack,
 } from '../game/board';
-import { Board, GameState, Ship } from '../game/types';
+import { AiState, Board, Difficulty, GameState, Ship } from '../game/types';
+import { createInitialAiState, getAiMoveForDifficulty, updateAiStateAfterShot } from '../game/ai';
 import BoardView from './BoardView';
 
 const DEFAULT_SIZE = 10;
@@ -20,24 +21,19 @@ const FLEET: Ship[] = [
   { id: 'destroyer', name: 'Destroyer', length: 2, coordinates: [], hits: 0 },
 ];
 
-const getRandomUntargetedCell = (board: Board): { x: number; y: number } | null => {
-  const available: { x: number; y: number }[] = [];
-
-  board.cells.forEach((row, y) => {
-    row.forEach((cell, x) => {
-      if (cell.status !== 'hit' && cell.status !== 'miss') {
-        available.push({ x, y });
-      }
-    });
-  });
-
-  if (available.length === 0) return null;
-
-  const index = Math.floor(Math.random() * available.length);
-  return available[index];
+const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  easy: 'Easy',
+  medium: 'Medium',
+  hard: 'Hard',
 };
 
-const createInitialGameState = (): GameState => {
+const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
+  easy: 'Random shots',
+  medium: 'Hunt & Target',
+  hard: 'Monte Carlo',
+};
+
+const createInitialGameState = (difficulty: Difficulty): GameState => {
   const baseBoard = createEmptyBoard(DEFAULT_SIZE);
   const playerBoard = placeFleetRandomly(baseBoard, FLEET);
   const aiBoard = placeFleetRandomly(createEmptyBoard(DEFAULT_SIZE), FLEET);
@@ -49,11 +45,14 @@ const createInitialGameState = (): GameState => {
     phase: 'playing',
     winner: null,
     turnCount: 0,
+    difficulty,
+    aiState: createInitialAiState(),
   };
 };
 
 export default function Game() {
-  const [state, setState] = useState<GameState>(() => createInitialGameState());
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('medium');
+  const [state, setState] = useState<GameState>(() => createInitialGameState(selectedDifficulty));
   const [placementIndex, setPlacementIndex] = useState<number | null>(null);
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
 
@@ -61,7 +60,7 @@ export default function Game() {
 
   const startAutoGame = () => {
     setPlacementIndex(null);
-    setState(createInitialGameState());
+    setState(createInitialGameState(selectedDifficulty));
   };
 
   const startManualPlacement = () => {
@@ -77,29 +76,32 @@ export default function Game() {
       phase: 'placing',
       winner: null,
       turnCount: 0,
+      difficulty: selectedDifficulty,
+      aiState: createInitialAiState(),
     });
   };
 
-  const takeAiTurn = (board: Board): { nextBoard: Board; aiWon: boolean } => {
-    const target = getRandomUntargetedCell(board);
+  const takeAiTurn = (
+    board: Board,
+    currentState: GameState
+  ): { nextBoard: Board; aiWon: boolean; newAiState: AiState } => {
+    const target = getAiMoveForDifficulty(currentState);
     if (!target) {
-      // No valid moves left; treat as not winning, game should end via allShipsSunk.
       const aiWon = allShipsSunk(board);
-      return { nextBoard: board, aiWon };
+      return { nextBoard: board, aiWon, newAiState: currentState.aiState };
     }
 
-    const { board: nextBoard } = receiveAttack(board, target);
+    const { board: nextBoard, hit, sunkShip } = receiveAttack(board, target);
+    const newAiState = updateAiStateAfterShot(currentState.aiState, target, hit, nextBoard, sunkShip);
     const aiWon = allShipsSunk(nextBoard);
-    return { nextBoard, aiWon };
+    return { nextBoard, aiWon, newAiState };
   };
 
   const handleOpponentCellClick = (x: number, y: number) => {
     if (gameOver || state.currentTurn !== 'human') return;
 
-    // Human attacks AI board
     const { board: nextAiBoard } = receiveAttack(state.aiBoard, { x, y });
 
-    // If attack was a repeat or out of bounds, nothing changed.
     if (nextAiBoard === state.aiBoard) return;
 
     const humanWon = allShipsSunk(nextAiBoard);
@@ -115,8 +117,12 @@ export default function Game() {
       return;
     }
 
-    // AI takes a turn immediately after a valid human move
-    const { nextBoard: nextPlayerBoard, aiWon } = takeAiTurn(state.playerBoard);
+    const stateForAi: GameState = {
+      ...state,
+      aiBoard: nextAiBoard,
+    };
+
+    const { nextBoard: nextPlayerBoard, aiWon, newAiState } = takeAiTurn(state.playerBoard, stateForAi);
 
     setState((prev) => ({
       ...prev,
@@ -126,6 +132,7 @@ export default function Game() {
       phase: aiWon ? 'finished' : 'playing',
       currentTurn: 'human',
       turnCount: prev.turnCount + 1,
+      aiState: newAiState,
     }));
   };
 
@@ -149,7 +156,6 @@ export default function Game() {
 
     const nextIndex = placementIndex + 1;
     if (nextIndex >= FLEET.length) {
-      // All ships placed: generate AI board and start playing
       const aiBoard = placeFleetRandomly(createEmptyBoard(DEFAULT_SIZE), FLEET);
       setPlacementIndex(null);
       setState({
@@ -159,6 +165,8 @@ export default function Game() {
         phase: 'playing',
         winner: null,
         turnCount: 0,
+        difficulty: selectedDifficulty,
+        aiState: createInitialAiState(),
       });
     } else {
       setPlacementIndex(nextIndex);
@@ -198,6 +206,24 @@ export default function Game() {
           <div className="text-xs text-slate-400">Turn: {state.turnCount}</div>
           <div className="text-sm font-medium text-slate-100">{statusText}</div>
           <div className="mt-1 flex flex-wrap items-center gap-2 justify-end">
+            <div className="flex items-center gap-1 text-[11px] text-slate-300 mr-2">
+              <span>AI Difficulty:</span>
+              {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => (
+                <button
+                  key={diff}
+                  type="button"
+                  onClick={() => setSelectedDifficulty(diff)}
+                  title={DIFFICULTY_DESCRIPTIONS[diff]}
+                  className={`px-2 py-0.5 rounded border text-xs ${
+                    selectedDifficulty === diff
+                      ? 'bg-sky-600 border-sky-400 text-white'
+                      : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {DIFFICULTY_LABELS[diff]}
+                </button>
+              ))}
+            </div>
             {state.phase === 'placing' && (
               <div className="flex items-center gap-1 text-[11px] text-slate-300 mr-2">
                 <span>Orientation:</span>
