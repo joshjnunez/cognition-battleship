@@ -50,14 +50,37 @@ const getEasyMove = (board: Board, aiState: AiState): Coordinates | null => {
 };
 
 const getMediumMove = (board: Board, aiState: AiState): Coordinates | null => {
-  const validTargets = aiState.huntQueue.filter((coord) =>
-    isValidTarget(board, coord, aiState.shotHistory)
+  // Prefer cells in the huntQueue (adjacent to previous hits)
+  let validTargets = aiState.huntQueue.filter((coord) =>
+    isValidTarget(board, coord, aiState.shotHistory),
   );
 
   if (validTargets.length > 0) {
     return validTargets[0];
   }
 
+  // If we have a streak of hits but the current huntQueue is exhausted,
+  // rebuild a fresh queue from all hit cells to keep chasing ships.
+  if (aiState.hitStreak.length > 0) {
+    const rebuilt: Coordinates[] = [];
+    for (const hit of aiState.hitStreak) {
+      for (const adj of getAdjacentCells(hit)) {
+        if (
+          isValidTarget(board, adj, aiState.shotHistory) &&
+          !rebuilt.some((c) => coordsEqual(c, adj))
+        ) {
+          rebuilt.push(adj);
+        }
+      }
+    }
+
+    validTargets = rebuilt;
+    if (validTargets.length > 0) {
+      return validTargets[0];
+    }
+  }
+
+  // Fall back to random when there are no promising targets.
   return getEasyMove(board, aiState);
 };
 
@@ -88,15 +111,18 @@ const canShipFitAt = (
   return true;
 };
 
-const getHardMove = (board: Board, aiState: AiState): Coordinates | null => {
+export const getHardProbabilityMap = (
+  board: Board,
+  aiState: AiState,
+): { probabilityMap: number[][]; max: number } => {
   const remainingShips = getRemainingShips(board);
-  if (remainingShips.length === 0) {
-    return getEasyMove(board, aiState);
-  }
-
   const probabilityMap: number[][] = Array.from({ length: board.size }, () =>
-    Array(board.size).fill(0)
+    Array(board.size).fill(0),
   );
+
+  if (remainingShips.length === 0) {
+    return { probabilityMap, max: 0 };
+  }
 
   const shipLengths = remainingShips.map((ship) => ship.length);
 
@@ -142,13 +168,32 @@ const getHardMove = (board: Board, aiState: AiState): Coordinates | null => {
       const adjacent = getAdjacentCells(hit);
       for (const adj of adjacent) {
         if (isValidTarget(board, adj, aiState.shotHistory)) {
-          probabilityMap[adj.y][adj.x] *= 3;
+          // Strongly favor cells around hits in Hard mode.
+          probabilityMap[adj.y][adj.x] = probabilityMap[adj.y][adj.x] * 4 + 1;
         }
       }
     }
   }
 
   let maxProb = 0;
+  for (let y = 0; y < board.size; y++) {
+    for (let x = 0; x < board.size; x++) {
+      if (probabilityMap[y][x] > maxProb) {
+        maxProb = probabilityMap[y][x];
+      }
+    }
+  }
+
+  return { probabilityMap, max: maxProb };
+};
+
+const getHardMove = (board: Board, aiState: AiState): Coordinates | null => {
+  const { probabilityMap, max } = getHardProbabilityMap(board, aiState);
+
+  if (max <= 0) {
+    return getEasyMove(board, aiState);
+  }
+
   const candidates: Coordinates[] = [];
 
   for (let y = 0; y < board.size; y++) {
@@ -162,11 +207,7 @@ const getHardMove = (board: Board, aiState: AiState): Coordinates | null => {
       }
 
       const prob = probabilityMap[y][x];
-      if (prob > maxProb) {
-        maxProb = prob;
-        candidates.length = 0;
-        candidates.push({ x, y });
-      } else if (prob === maxProb && prob > 0) {
+      if (prob === max) {
         candidates.push({ x, y });
       }
     }
@@ -182,17 +223,35 @@ const getHardMove = (board: Board, aiState: AiState): Coordinates | null => {
 
 export const getAiMoveForDifficulty = (gameState: GameState): Coordinates | null => {
   const { playerBoard, difficulty, aiState } = gameState;
+  let target: Coordinates | null = null;
 
   switch (difficulty) {
     case 'easy':
-      return getEasyMove(playerBoard, aiState);
+      target = getEasyMove(playerBoard, aiState);
+      break;
     case 'medium':
-      return getMediumMove(playerBoard, aiState);
+      target = getMediumMove(playerBoard, aiState);
+      break;
     case 'hard':
-      return getHardMove(playerBoard, aiState);
+      target = getHardMove(playerBoard, aiState);
+      break;
     default:
-      return getEasyMove(playerBoard, aiState);
+      target = getEasyMove(playerBoard, aiState);
   }
+
+  // Debug logging to help verify behavior; safe to remove later.
+  if (typeof window !== 'undefined') {
+    // eslint-disable-next-line no-console
+    console.log('[AI] move', {
+      difficulty,
+      target,
+      huntQueueSize: aiState.huntQueue.length,
+      hitStreakSize: aiState.hitStreak.length,
+      shotsTaken: aiState.shotHistory.length,
+    });
+  }
+
+  return target;
 };
 
 export const updateAiStateAfterShot = (

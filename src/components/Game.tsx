@@ -8,7 +8,7 @@ import {
   receiveAttack,
 } from '../game/board';
 import { AiState, Board, Difficulty, GameState, Ship } from '../game/types';
-import { createInitialAiState, getAiMoveForDifficulty, updateAiStateAfterShot } from '../game/ai';
+import { createInitialAiState, getAiMoveForDifficulty, getHardProbabilityMap, updateAiStateAfterShot } from '../game/ai';
 import BoardView from './BoardView';
 
 const DEFAULT_SIZE = 10;
@@ -55,12 +55,33 @@ export default function Game() {
   const [state, setState] = useState<GameState>(() => createInitialGameState(selectedDifficulty));
   const [placementIndex, setPlacementIndex] = useState<number | null>(null);
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [showHardInsight, setShowHardInsight] = useState(false);
 
   const gameOver = state.phase === 'finished';
 
   const startAutoGame = () => {
     setPlacementIndex(null);
     setState(createInitialGameState(selectedDifficulty));
+  };
+
+  const handleDifficultyClick = (difficulty: Difficulty) => {
+    setSelectedDifficulty(difficulty);
+    if (state.phase === 'placing') {
+      // While manually placing ships, changing difficulty should *not*
+      // reset placement. Just update the difficulty that will be used
+      // once play begins.
+      setState((prev) => ({
+        ...prev,
+        difficulty,
+      }));
+      return;
+    }
+
+    // In playing/finished phases, changing difficulty starts a fresh
+    // auto-generated game at the chosen difficulty.
+    setPlacementIndex(null);
+    setOrientation('horizontal');
+    setState(createInitialGameState(difficulty));
   };
 
   const startManualPlacement = () => {
@@ -84,17 +105,31 @@ export default function Game() {
   const takeAiTurn = (
     board: Board,
     currentState: GameState
-  ): { nextBoard: Board; aiWon: boolean; newAiState: AiState } => {
+  ): { nextBoard: Board; aiWon: boolean; newAiState: AiState; hardDebug?: GameState['hardDebug'] } => {
+    // Build probability map for Hard mode so we can optionally visualize it.
+    let hardDebug: GameState['hardDebug'] | undefined;
+    if (currentState.difficulty === 'hard') {
+      const { probabilityMap, max } = getHardProbabilityMap(board, currentState.aiState);
+      hardDebug = { probabilityMap, max };
+    }
+
     const target = getAiMoveForDifficulty(currentState);
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.log('[AI] turn', {
+        difficulty: currentState.difficulty,
+        target,
+      });
+    }
     if (!target) {
       const aiWon = allShipsSunk(board);
-      return { nextBoard: board, aiWon, newAiState: currentState.aiState };
+      return { nextBoard: board, aiWon, newAiState: currentState.aiState, hardDebug };
     }
 
     const { board: nextBoard, hit, sunkShip } = receiveAttack(board, target);
     const newAiState = updateAiStateAfterShot(currentState.aiState, target, hit, nextBoard, sunkShip);
     const aiWon = allShipsSunk(nextBoard);
-    return { nextBoard, aiWon, newAiState };
+    return { nextBoard, aiWon, newAiState, hardDebug };
   };
 
   const handleOpponentCellClick = (x: number, y: number) => {
@@ -122,7 +157,7 @@ export default function Game() {
       aiBoard: nextAiBoard,
     };
 
-    const { nextBoard: nextPlayerBoard, aiWon, newAiState } = takeAiTurn(state.playerBoard, stateForAi);
+    const { nextBoard: nextPlayerBoard, aiWon, newAiState, hardDebug } = takeAiTurn(state.playerBoard, stateForAi);
 
     setState((prev) => ({
       ...prev,
@@ -133,6 +168,7 @@ export default function Game() {
       currentTurn: 'human',
       turnCount: prev.turnCount + 1,
       aiState: newAiState,
+      hardDebug: hardDebug ?? prev.hardDebug,
     }));
   };
 
@@ -196,80 +232,104 @@ export default function Game() {
   })();
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-lg p-6 space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-white">Cognition Battleship</h2>
-          <p className="mt-1 text-sm text-slate-300 max-w-xl">Sink all of your opponent's ships before they sink yours.</p>
+    <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-lg px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 space-y-5 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="text-center sm:text-left">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white">Cognition Battleship</h2>
+          <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-xl mx-auto sm:mx-0">
+            Sink all of your opponent&apos;s ships before they sink yours.
+          </p>
         </div>
-        <div className="flex flex-col items-end gap-2 text-right">
-          <div className="text-xs text-slate-400">Turn: {state.turnCount}</div>
-          <div className="text-sm font-medium text-slate-100">{statusText}</div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 justify-end">
-            <div className="flex items-center gap-1 text-[11px] text-slate-300 mr-2">
-              <span>AI Difficulty:</span>
-              {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => (
-                <button
-                  key={diff}
-                  type="button"
-                  onClick={() => setSelectedDifficulty(diff)}
-                  title={DIFFICULTY_DESCRIPTIONS[diff]}
-                  className={`px-2 py-0.5 rounded border text-xs ${
-                    selectedDifficulty === diff
-                      ? 'bg-sky-600 border-sky-400 text-white'
-                      : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  {DIFFICULTY_LABELS[diff]}
-                </button>
-              ))}
-            </div>
-            {state.phase === 'placing' && (
-              <div className="flex items-center gap-1 text-[11px] text-slate-300 mr-2">
-                <span>Orientation:</span>
-                <button
-                  type="button"
-                  onClick={() => setOrientation('horizontal')}
-                  className={`px-2 py-0.5 rounded border text-xs ${
-                    orientation === 'horizontal'
-                      ? 'bg-slate-600 border-slate-400 text-white'
-                      : 'bg-slate-800 border-slate-600 text-slate-300'
-                  }`}
-                >
-                  H
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOrientation('vertical')}
-                  className={`px-2 py-0.5 rounded border text-xs ${
-                    orientation === 'vertical'
-                      ? 'bg-slate-600 border-slate-400 text-white'
-                      : 'bg-slate-800 border-slate-600 text-slate-300'
-                  }`}
-                >
-                  V
-                </button>
+        <div className="flex flex-col items-center sm:items-end gap-1.5 sm:gap-2 text-center sm:text-right text-xs sm:text-sm">
+          <div className="text-[11px] sm:text-xs text-slate-400">Turn: {state.turnCount}</div>
+          <div className="text-sm font-medium text-slate-100 max-w-xs sm:max-w-none">{statusText}</div>
+          <div className="mt-1 flex flex-col gap-1.5 sm:gap-2 items-center sm:items-end w-full">
+            <div className="w-full max-w-xs sm:max-w-sm md:max-w-md rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1.5 flex flex-col gap-1.5">
+              <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-300 justify-center sm:justify-end">
+                <span>AI Difficulty:</span>
+                {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => (
+                  <button
+                    key={diff}
+                    type="button"
+                    onClick={() => handleDifficultyClick(diff)}
+                    title={DIFFICULTY_DESCRIPTIONS[diff]}
+                    className={`px-2 py-0.5 rounded border text-xs ${
+                      selectedDifficulty === diff
+                        ? 'bg-sky-600 border-sky-400 text-white'
+                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {DIFFICULTY_LABELS[diff]}
+                  </button>
+                ))}
               </div>
-            )}
-            <button
-              type="button"
-              onClick={startAutoGame}
-              className="inline-flex items-center rounded-md bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-100 shadow-sm hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-            >
-              New Game (Auto)
-            </button>
-            <button
-              type="button"
-              onClick={startManualPlacement}
-              className="inline-flex items-center rounded-md bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-100 shadow-sm hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-            >
-              New Game (Manual)
-            </button>
+              {state.difficulty === 'hard' && (
+                <p className="text-[10px] sm:text-[11px] text-slate-400 text-center sm:text-right leading-snug">
+                  Heatmap on Your Fleet shows where Hard AI thinks your ships are most likely.
+                  Darker cells = higher probability.
+                </p>
+              )}
+              {state.phase === 'placing' && (
+                <div className="flex items-center gap-1 text-[11px] text-slate-300 justify-center sm:justify-end">
+                  <span>Orientation:</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrientation('horizontal')}
+                    className={`px-2 py-0.5 rounded border text-xs ${
+                      orientation === 'horizontal'
+                        ? 'bg-slate-600 border-slate-400 text-white'
+                        : 'bg-slate-800 border-slate-600 text-slate-300'
+                    }`}
+                  >
+                    H
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrientation('vertical')}
+                    className={`px-2 py-0.5 rounded border text-xs ${
+                      orientation === 'vertical'
+                        ? 'bg-slate-600 border-slate-400 text-white'
+                        : 'bg-slate-800 border-slate-600 text-slate-300'
+                    }`}
+                  >
+                    V
+                  </button>
+                </div>
+              )}
+              {state.difficulty === 'hard' && (
+                <div className="flex justify-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowHardInsight((v) => !v)}
+                    className="px-2 py-0.5 rounded-md border border-slate-600 text-[11px] text-slate-200 bg-slate-800 hover:bg-slate-700"
+                  >
+                    {showHardInsight ? 'Hide Hard AI Heatmap' : 'Show Hard AI Heatmap'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-end">
+              <button
+                type="button"
+                onClick={startAutoGame}
+                className="inline-flex items-center rounded-md bg-slate-700 px-2.5 py-1 text-[11px] sm:text-xs font-medium text-slate-100 shadow-sm hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+              >
+                New Game (Auto)
+              </button>
+              <button
+                type="button"
+                onClick={startManualPlacement}
+                className="inline-flex items-center rounded-md bg-slate-700 px-2.5 py-1 text-[11px] sm:text-xs font-medium text-slate-100 shadow-sm hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+              >
+                New Game (Manual)
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="flex flex-col gap-6 sm:gap-8 md:flex-row md:items-start md:justify-center">
         <BoardView
           title="Your Fleet"
           board={state.playerBoard}
@@ -277,6 +337,11 @@ export default function Game() {
           isInteractive={state.phase === 'placing'}
           hideShips={false}
           gameOver={gameOver}
+          probabilityMap={state.hardDebug?.probabilityMap}
+          probabilityMax={state.hardDebug?.max}
+          showProbability={showHardInsight && state.difficulty === 'hard'}
+          celebrateLoss={state.phase === 'finished' && state.winner === 'ai'}
+          celebrationText="YOU LOSE"
         />
 
         <BoardView
@@ -286,6 +351,8 @@ export default function Game() {
           isInteractive={state.phase === 'playing' && !gameOver}
           hideShips
           gameOver={gameOver}
+          celebrateLoss={state.phase === 'finished' && state.winner === 'human'}
+          celebrationText="YOU WIN"
         />
       </div>
     </div>

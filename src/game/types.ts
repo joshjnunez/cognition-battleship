@@ -48,4 +48,8 @@ export interface GameState {
   turnCount: number;
   difficulty: Difficulty;
   aiState: AiState;
+  hardDebug?: {
+    probabilityMap: number[][];
+    max: number;
+  };
 }

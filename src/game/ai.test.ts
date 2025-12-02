@@ -235,6 +235,49 @@ describe('AI Difficulty Behavior', () => {
 
       expect(move).not.toBeNull();
     });
+
+    it('should keep firing near a cluster of hits over multiple turns', () => {
+      const board = createEmptyBoard(7);
+      const firstHit: Coordinates = { x: 3, y: 3 };
+      const secondHit: Coordinates = { x: 4, y: 3 };
+
+      // Mark hits on the board and a partial ship so it is not yet sunk.
+      board.cells[firstHit.y][firstHit.x].status = 'hit';
+      board.cells[firstHit.y][firstHit.x].shipId = 'ship1';
+      board.cells[secondHit.y][secondHit.x].status = 'hit';
+      board.cells[secondHit.y][secondHit.x].shipId = 'ship1';
+
+      const ship = createTestShip(
+        'ship1',
+        3,
+        [
+          { x: 3, y: 3 },
+          { x: 4, y: 3 },
+          { x: 5, y: 3 },
+        ],
+        2,
+      );
+      board.ships = [ship];
+
+      // Build up AI state as if it has just scored two hits in a row.
+      let aiState = createInitialAiState();
+      aiState = updateAiStateAfterShot(aiState, firstHit, true, board);
+      aiState = updateAiStateAfterShot(aiState, secondHit, true, board);
+
+      // Over several turns, the AI should keep choosing cells adjacent
+      // to at least one of the known hits, instead of wandering far away.
+      const gameStateBase = createTestGameState(board, 'medium', aiState);
+      const cluster = [firstHit, secondHit];
+
+      for (let i = 0; i < 4; i++) {
+        const move = getAiMoveForDifficulty(gameStateBase);
+        expect(move).not.toBeNull();
+        if (move) {
+          const nearAnyHit = cluster.some((hit) => isAdjacent(move, hit));
+          expect(nearAnyHit).toBe(true);
+        }
+      }
+    });
   });
 
   describe('Hard AI - Probability-based behavior', () => {
