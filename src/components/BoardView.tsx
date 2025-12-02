@@ -76,14 +76,14 @@ export default function BoardView({
 
             const disabled = gameOver || !isInteractive || isHit || isMiss;
 
-            let probBg = '';
-            if (!celebrateLoss && showProbability && probabilityMap && typeof probabilityMax === 'number') {
+            // Calculate heatmap overlay alpha based on probability
+            let heatmapAlpha = 0;
+            if (!celebrateLoss && showProbability && probabilityMap && typeof probabilityMax === 'number' && probabilityMax > 0) {
               const cellProb = probabilityMap[y]?.[x] ?? 0;
-              if (probabilityMax > 0 && cellProb > 0 && !isHit && !isMiss) {
+              if (cellProb > 0 && !isHit && !isMiss) {
                 const weight = cellProb / probabilityMax;
-                if (weight > 0.66) probBg = ' bg-sky-400/80';
-                else if (weight > 0.33) probBg = ' bg-sky-400/55';
-                else probBg = ' bg-sky-400/35';
+                // Scale alpha from 0.2 to 0.7 based on probability weight
+                heatmapAlpha = 0.2 + 0.5 * weight;
               }
             }
 
@@ -100,15 +100,22 @@ export default function BoardView({
               : '';
 
             return (
-              <button
-                key={`${x}-${y}`}
-                type="button"
-                onClick={() => handleClick(x, y)}
-                disabled={disabled}
-                className={`aspect-square w-full border border-slate-700 flex items-center justify-center text-[10px] sm:text-xs text-white rounded-[3px] sm:rounded-[4px] ${bg}${probBg}${extraLossClasses} disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-colors transition-transform duration-150 active:scale-[0.97]`}
-              >
-                {content}
-              </button>
+              <div key={`${x}-${y}`} className="relative">
+                <button
+                  type="button"
+                  onClick={() => handleClick(x, y)}
+                  disabled={disabled}
+                  className={`aspect-square w-full border border-slate-700 flex items-center justify-center text-[10px] sm:text-xs text-white rounded-[3px] sm:rounded-[4px] ${bg}${extraLossClasses} disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-colors transition-transform duration-150 active:scale-[0.97]`}
+                >
+                  {content}
+                </button>
+                {heatmapAlpha > 0 && (
+                  <div
+                    className="absolute inset-0 pointer-events-none rounded-[3px] sm:rounded-[4px]"
+                    style={{ backgroundColor: `rgba(56, 189, 248, ${heatmapAlpha})` }}
+                  />
+                )}
+              </div>
             );
           }),
         )}
