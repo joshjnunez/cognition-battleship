@@ -10,6 +10,7 @@ import {
 import { AiState, Board, Difficulty, GameState, Ship } from '../game/types';
 import { createInitialAiState, getAiMoveForDifficulty, getHardProbabilityMap, updateAiStateAfterShot } from '../game/ai';
 import BoardView from './BoardView';
+import HelpModal from './HelpModal';
 
 const DEFAULT_SIZE = 10;
 
@@ -56,6 +57,7 @@ export default function Game() {
   const [placementIndex, setPlacementIndex] = useState<number | null>(null);
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
   const [showHardInsight, setShowHardInsight] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const gameOver = state.phase === 'finished';
 
@@ -106,13 +108,6 @@ export default function Game() {
     board: Board,
     currentState: GameState
   ): { nextBoard: Board; aiWon: boolean; newAiState: AiState; hardDebug?: GameState['hardDebug'] } => {
-    // Build probability map for Hard mode so we can optionally visualize it.
-    let hardDebug: GameState['hardDebug'] | undefined;
-    if (currentState.difficulty === 'hard') {
-      const { probabilityMap, max } = getHardProbabilityMap(board, currentState.aiState);
-      hardDebug = { probabilityMap, max };
-    }
-
     const target = getAiMoveForDifficulty(currentState);
     if (typeof window !== 'undefined') {
       // eslint-disable-next-line no-console
@@ -123,12 +118,23 @@ export default function Game() {
     }
     if (!target) {
       const aiWon = allShipsSunk(board);
-      return { nextBoard: board, aiWon, newAiState: currentState.aiState, hardDebug };
+      // No valid target; just return current board and AI state.
+      return { nextBoard: board, aiWon, newAiState: currentState.aiState };
     }
 
+    // Apply the AI shot to the player's board.
     const { board: nextBoard, hit, sunkShip } = receiveAttack(board, target);
     const newAiState = updateAiStateAfterShot(currentState.aiState, target, hit, nextBoard, sunkShip);
     const aiWon = allShipsSunk(nextBoard);
+
+    // Build probability map for Hard mode AFTER updating the board and AI state,
+    // so the heatmap always reflects the latest information.
+    let hardDebug: GameState['hardDebug'] | undefined;
+    if (currentState.difficulty === 'hard') {
+      const { probabilityMap, max } = getHardProbabilityMap(nextBoard, newAiState);
+      hardDebug = { probabilityMap, max };
+    }
+
     return { nextBoard, aiWon, newAiState, hardDebug };
   };
 
@@ -234,10 +240,19 @@ export default function Game() {
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-lg px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 space-y-5 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="text-center sm:text-left">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white">Cognition Battleship</h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-xl mx-auto sm:mx-0">
-            Sink all of your opponent&apos;s ships before they sink yours.
+        <div className="flex flex-col items-center sm:items-start gap-1 sm:gap-1.5">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white">Cognition Battleship</h2>
+            <button
+              type="button"
+              onClick={() => setShowHelp(true)}
+              className="inline-flex items-center rounded-full border border-slate-600 px-2 py-0.5 text-[10px] sm:text-[11px] text-slate-200 hover:bg-slate-800"
+            >
+              How to Play
+            </button>
+          </div>
+          <p className="mt-0.5 text-xs sm:text-sm text-slate-300 max-w-xl mx-auto sm:mx-0">
+            Sink all of your opponent&apos;s ships before they sink yours. Choose a difficulty and challenge the AI.
           </p>
         </div>
         <div className="flex flex-col items-center sm:items-end gap-1.5 sm:gap-2 text-center sm:text-right text-xs sm:text-sm">
@@ -355,6 +370,7 @@ export default function Game() {
           celebrationText="YOU WIN"
         />
       </div>
+      <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 }

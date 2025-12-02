@@ -81,9 +81,9 @@ export default function BoardView({
               const cellProb = probabilityMap[y]?.[x] ?? 0;
               if (probabilityMax > 0 && cellProb > 0 && !isHit && !isMiss) {
                 const weight = cellProb / probabilityMax;
-                if (weight > 0.66) probBg = ' bg-sky-500/40';
-                else if (weight > 0.33) probBg = ' bg-sky-500/25';
-                else probBg = ' bg-sky-500/15';
+                if (weight > 0.66) probBg = ' bg-sky-400/80';
+                else if (weight > 0.33) probBg = ' bg-sky-400/55';
+                else probBg = ' bg-sky-400/35';
               }
             }
 
