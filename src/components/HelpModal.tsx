@@ -65,9 +65,20 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
           <section className="space-y-1">
             <h3 className="font-semibold text-slate-100">Hard AI Heatmap</h3>
             <p className="text-slate-300">
-              On Hard, you can toggle the <span className="font-semibold">Show Heatmap</span> button.
-              Your Fleet will show a blue overlay where the AI believes your ships are most likely.
-              Lighter blue means higher probability.
+              On Hard, you can toggle the <span className="font-semibold">Show Heatmap</span> button. This doesn&apos;t
+              show where your ships actually are; instead it shows what the AI believes.
+            </p>
+            <p className="text-slate-300">
+              Each turn, Hard AI builds a <span className="font-semibold">probability map</span> of your board.
+              It looks at every ship it still needs to find, tries all legal ways those ships could fit on
+              <span className="font-semibold"> Your Fleet</span>, and counts how often each cell would contain a ship.
+              Cells that appear in more valid layouts get a higher score.
+            </p>
+            <p className="text-slate-300">
+              The blue overlay is that score, normalized:
+              darker blue means &quot;less likely&quot;, lighter blue means &quot;more likely&quot; for the next shot.
+              When the AI gets a hit, many impossible layouts are thrown away, so the brightest cells usually
+              cluster around hit locations.
             </p>
           </section>
 

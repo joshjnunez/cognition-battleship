@@ -266,7 +266,6 @@ export default function Game() {
               {state.difficulty === 'hard' && (
                 <p className="text-[10px] sm:text-[11px] text-slate-400 text-center sm:text-right leading-snug">
                   Heatmap on Your Fleet shows where Hard AI thinks your ships are most likely.
-                
                 </p>
               )}
               {state.phase === 'placing' && (
@@ -297,19 +296,28 @@ export default function Game() {
                 </div>
               )}
               {state.difficulty === 'hard' && (
-                <div className="flex justify-center sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowHardInsight((v) => !v)}
-                    className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition-colors ${
-                      showHardInsight
-                        ? 'border-sky-400 bg-sky-600 text-white hover:bg-sky-500'
-                        : 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700'
-                    }`}
-                    aria-pressed={showHardInsight}
-                  >
-                    {showHardInsight ? 'Hide Heatmap' : 'Show Heatmap'}
-                  </button>
+                <div className="flex flex-col gap-1 text-[11px] text-slate-300">
+                  <div className="flex justify-center sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowHardInsight((v) => !v)}
+                      className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition-colors ${
+                        showHardInsight
+                          ? 'border-sky-400 bg-sky-600 text-white hover:bg-sky-500'
+                          : 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700'
+                      }`}
+                      aria-pressed={showHardInsight}
+                    >
+                      {showHardInsight ? 'Hide Heatmap' : 'Show Heatmap'}
+                    </button>
+                  </div>
+                  {showHardInsight && (
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 text-center sm:text-right leading-snug">
+                      Hard AI builds a probability map of <span className="font-semibold">Your Fleet</span> each turn and shoots the
+                      lightest (most likely) cells. The blue overlay is that map: brighter squares are where the AI is
+                      most likely to fire next.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
