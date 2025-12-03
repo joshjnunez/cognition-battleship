@@ -11,6 +11,7 @@ import { AiState, Board, Difficulty, GameState, Ship } from '../game/types';
 import { createInitialAiState, getAiMoveForDifficulty, getHardProbabilityMap, updateAiStateAfterShot } from '../game/ai';
 import BoardView from './BoardView';
 import HelpModal from './HelpModal';
+import FleetOverview from './FleetOverview';
 
 const DEFAULT_SIZE = 10;
 
@@ -58,6 +59,7 @@ export default function Game() {
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
   const [showHardInsight, setShowHardInsight] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   const gameOver = state.phase === 'finished';
 
@@ -232,22 +234,12 @@ export default function Game() {
     <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-lg px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 space-y-5 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col items-center sm:items-start gap-1 sm:gap-1.5">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white">Cognition Battleship</h2>
-            <button
-              type="button"
-              onClick={() => setShowHelp(true)}
-              className="inline-flex items-center rounded-full bg-sky-600 hover:bg-sky-500 text-white border border-sky-400 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold shadow-sm"
-            >
-              How to Play
-            </button>
-          </div>
+          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white">Cognition Battleship</h2>
           <p className="mt-0.5 text-xs sm:text-sm text-slate-300 max-w-xl mx-auto sm:mx-0">
             Sink all of your opponent&apos;s ships before they sink yours. Choose a difficulty and challenge the AI.
           </p>
         </div>
         <div className="flex flex-col items-center sm:items-end gap-1.5 sm:gap-2 text-center sm:text-right text-xs sm:text-sm">
-          <div className="text-[11px] sm:text-xs text-slate-400">Turn: {state.turnCount}</div>
           {statusText && (
             <div className="text-sm font-medium text-slate-100 max-w-xs sm:max-w-none">{statusText}</div>
           )}
@@ -316,7 +308,7 @@ export default function Game() {
                     }`}
                     aria-pressed={showHardInsight}
                   >
-                    {showHardInsight ? 'Hide Hard AI Heatmap' : 'Show Hard AI Heatmap'}
+                    {showHardInsight ? 'Hide Heatmap' : 'Show Heatmap'}
                   </button>
                 </div>
               )}
@@ -341,6 +333,71 @@ export default function Game() {
           </div>
         </div>
       </div>
+
+      <section className="w-full max-w-4xl mx-auto bg-slate-900/70 border border-slate-700 rounded-lg px-3 py-2.5 sm:px-4 sm:py-3 space-y-2">
+        <button
+          type="button"
+          onClick={() => setShowGuide((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 text-left"
+        >
+          <div className="flex flex-col">
+            <span className="text-sm sm:text-base font-semibold text-slate-100">How to Play &amp; Fleet Overview</span>
+            <span className="text-[10px] sm:text-xs text-slate-400">Tap to {showGuide ? 'hide' : 'show'} quick instructions and your ships.</span>
+          </div>
+          <span className="text-xs sm:text-sm text-slate-300">
+            {showGuide ? '−' : '+'}
+          </span>
+        </button>
+
+        {showGuide && (
+          <div className="mt-2 flex flex-col gap-3 sm:gap-4 md:flex-row md:items-start md:justify-between">
+            <section className="w-full max-w-xs sm:max-w-sm md:max-w-md bg-slate-900/80 border border-slate-700 rounded-md px-3 py-3 sm:px-4 sm:py-4 space-y-2">
+              <h3 className="text-sm sm:text-base font-semibold text-slate-100">Quick Start</h3>
+              <ul className="list-disc list-inside space-y-1 text-[11px] sm:text-xs text-slate-300">
+                <li><span className="font-semibold">Step 1:</span> Choose an AI difficulty (Easy, Medium, or Hard).</li>
+                <li>
+                  <span className="font-semibold">Step 2:</span> Start a new game. Use <span className="font-semibold">Manual</span> to place your own
+                  ships, or <span className="font-semibold">Auto</span> to let the game place them for you.
+                </li>
+                <li>
+                  <span className="font-semibold">Step 3:</span> Tap squares on <span className="font-semibold">Opponent&apos;s Waters</span> to fire and
+                  search for the AI&apos;s ships.
+                </li>
+                <li>
+                  <span className="font-semibold">Goal:</span> Sink all 5 of the AI&apos;s ships before it sinks yours.
+                </li>
+              </ul>
+            </section>
+
+            <FleetOverview
+              ships={FLEET}
+              placingIndex={placementIndex}
+              phase={state.phase}
+              playerShips={state.playerBoard.ships}
+            />
+          </div>
+        )}
+      </section>
+
+      {state.phase === 'placing' && placementIndex !== null && (
+        <div className="w-full max-w-2xl mx-auto rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs text-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+          <div>
+            <span className="font-semibold">Placing:</span>{' '}
+            <span>
+              {FLEET[placementIndex]?.name} ({FLEET[placementIndex]?.length} cells)
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              <span className="font-semibold">Ships remaining:</span>{' '}
+              {FLEET.length - placementIndex} of {FLEET.length}
+            </span>
+            <span className="text-slate-300">
+              Click a starting square on <span className="font-semibold">Your Fleet</span>. Use <span className="font-semibold">H</span> / <span className="font-semibold">V</span> to rotate.
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-6 sm:gap-8 md:flex-row md:items-start md:justify-center">
         <BoardView
