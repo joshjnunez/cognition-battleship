@@ -39,6 +39,11 @@ export interface AiState {
   hitStreak: Coordinates[];
 }
 
+export interface Scores {
+  player1: number;
+  player2: number;
+}
+
 export interface GameState {
   playerBoard: Board;
   aiBoard: Board;
@@ -48,6 +53,7 @@ export interface GameState {
   turnCount: number;
   difficulty: Difficulty;
   aiState: AiState;
+  scores: Scores;
   hardDebug?: {
     probabilityMap: number[][];
     max: number;

@@ -47,6 +47,7 @@ const createTestGameState = (
   turnCount: 1,
   difficulty,
   aiState,
+  scores: { player1: 0, player2: 0 },
 });
 
 const isAdjacent = (a: Coordinates, b: Coordinates): boolean => {

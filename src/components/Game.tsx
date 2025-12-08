@@ -7,7 +7,7 @@ import {
   placeShipAt,
   receiveAttack,
 } from '../game/board';
-import { AiState, Board, Difficulty, GameState, Ship } from '../game/types';
+import { AiState, Board, Difficulty, GameState, Scores, Ship } from '../game/types';
 import { createInitialAiState, getAiMoveForDifficulty, getHardProbabilityMap, updateAiStateAfterShot } from '../game/ai';
 import BoardView from './BoardView';
 import HelpModal from './HelpModal';
@@ -35,6 +35,11 @@ const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
   hard: 'Monte Carlo',
 };
 
+const createInitialScores = (): Scores => ({
+  player1: 0,
+  player2: 0,
+});
+
 const createInitialGameState = (difficulty: Difficulty): GameState => {
   const baseBoard = createEmptyBoard(DEFAULT_SIZE);
   const playerBoard = placeFleetRandomly(baseBoard, FLEET);
@@ -49,6 +54,7 @@ const createInitialGameState = (difficulty: Difficulty): GameState => {
     turnCount: 0,
     difficulty,
     aiState: createInitialAiState(),
+    scores: createInitialScores(),
   };
 };
 
@@ -103,42 +109,53 @@ export default function Game() {
       turnCount: 0,
       difficulty: selectedDifficulty,
       aiState: createInitialAiState(),
+      scores: createInitialScores(),
     });
   };
 
   const takeAiTurn = (
     board: Board,
     currentState: GameState
-  ): { nextBoard: Board; aiWon: boolean; newAiState: AiState; hardDebug?: GameState['hardDebug'] } => {
+  ): { nextBoard: Board; aiWon: boolean; newAiState: AiState; aiScoreGain: number; hardDebug?: GameState['hardDebug'] } => {
     const target = getAiMoveForDifficulty(currentState);
     if (!target) {
       const aiWon = allShipsSunk(board);
-      // No valid target; just return current board and AI state.
-      return { nextBoard: board, aiWon, newAiState: currentState.aiState };
+      return { nextBoard: board, aiWon, newAiState: currentState.aiState, aiScoreGain: 0 };
     }
 
-    // Apply the AI shot to the player's board.
     const { board: nextBoard, hit, sunkShip } = receiveAttack(board, target);
     const newAiState = updateAiStateAfterShot(currentState.aiState, target, hit, nextBoard, sunkShip);
     const aiWon = allShipsSunk(nextBoard);
 
-    // Build probability map for Hard mode AFTER updating the board and AI state,
-    // so the heatmap always reflects the latest information.
+    let aiScoreGain = 0;
+    if (sunkShip) {
+      aiScoreGain = 25;
+    } else if (hit) {
+      aiScoreGain = 10;
+    }
+
     let hardDebug: GameState['hardDebug'] | undefined;
     if (currentState.difficulty === 'hard') {
       const { probabilityMap, max } = getHardProbabilityMap(nextBoard, newAiState);
       hardDebug = { probabilityMap, max };
     }
 
-    return { nextBoard, aiWon, newAiState, hardDebug };
+    return { nextBoard, aiWon, newAiState, aiScoreGain, hardDebug };
   };
 
   const handleOpponentCellClick = (x: number, y: number) => {
     if (gameOver || state.currentTurn !== 'human') return;
 
-    const { board: nextAiBoard } = receiveAttack(state.aiBoard, { x, y });
+    const { board: nextAiBoard, hit, sunkShip } = receiveAttack(state.aiBoard, { x, y });
 
     if (nextAiBoard === state.aiBoard) return;
+
+    let playerScoreGain = 0;
+    if (sunkShip) {
+      playerScoreGain = 25;
+    } else if (hit) {
+      playerScoreGain = 10;
+    }
 
     const humanWon = allShipsSunk(nextAiBoard);
 
@@ -149,6 +166,10 @@ export default function Game() {
         winner: 'human',
         phase: 'finished',
         turnCount: prev.turnCount + 1,
+        scores: {
+          ...prev.scores,
+          player1: prev.scores.player1 + playerScoreGain,
+        },
       }));
       return;
     }
@@ -156,9 +177,13 @@ export default function Game() {
     const stateForAi: GameState = {
       ...state,
       aiBoard: nextAiBoard,
+      scores: {
+        ...state.scores,
+        player1: state.scores.player1 + playerScoreGain,
+      },
     };
 
-    const { nextBoard: nextPlayerBoard, aiWon, newAiState, hardDebug } = takeAiTurn(state.playerBoard, stateForAi);
+    const { nextBoard: nextPlayerBoard, aiWon, newAiState, aiScoreGain, hardDebug } = takeAiTurn(state.playerBoard, stateForAi);
 
     setState((prev) => ({
       ...prev,
@@ -170,6 +195,10 @@ export default function Game() {
       turnCount: prev.turnCount + 1,
       aiState: newAiState,
       hardDebug: hardDebug ?? prev.hardDebug,
+      scores: {
+        player1: prev.scores.player1 + playerScoreGain,
+        player2: prev.scores.player2 + aiScoreGain,
+      },
     }));
   };
 
@@ -204,6 +233,7 @@ export default function Game() {
         turnCount: 0,
         difficulty: selectedDifficulty,
         aiState: createInitialAiState(),
+        scores: createInitialScores(),
       });
     } else {
       setPlacementIndex(nextIndex);
@@ -232,6 +262,17 @@ export default function Game() {
 
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-lg px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 space-y-5 sm:space-y-6">
+      <div className="flex justify-around mb-5 p-4 bg-slate-900/70 border border-slate-700 rounded-lg">
+        <div className="text-center">
+          <h3 className="text-sm sm:text-base font-semibold text-slate-100 mb-1">Player 1</h3>
+          <span className="text-2xl font-bold text-white">{state.scores.player1}</span>
+        </div>
+        <div className="text-center">
+          <h3 className="text-sm sm:text-base font-semibold text-slate-100 mb-1">Player 2</h3>
+          <span className="text-2xl font-bold text-white">{state.scores.player2}</span>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col items-center sm:items-start gap-1 sm:gap-1.5">
           <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white">Cognition Battleship</h2>
