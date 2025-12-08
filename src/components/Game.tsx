@@ -234,6 +234,25 @@ export default function Game() {
     <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-lg px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 space-y-5 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col items-center sm:items-start gap-1 sm:gap-1.5">
+          <div className="flex gap-4 text-xs sm:text-sm text-slate-400 mb-1">
+            <a 
+              href="https://github.com/joshjnunez/cognition-battleship" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-sky-400 transition-colors flex items-center gap-1"
+            >
+              Github Repo
+            </a>
+            <span className="text-slate-600">|</span>
+            <a 
+              href="https://docs.google.com/document/d/1OUE1O0BIzXnr7lq219p8EaZRWBZmLM-qE0mnc4GJuPE/edit?usp=sharing" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-sky-400 transition-colors flex items-center gap-1"
+            >
+              Bugs Documentation
+            </a>
+          </div>
           <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-white">Cognition Battleship</h2>
           <p className="mt-0.5 text-xs sm:text-sm text-slate-300 max-w-xl mx-auto sm:mx-0">
             Sink all of your opponent&apos;s ships before they sink yours. Choose a difficulty and challenge the AI.
